@@ -1,3 +1,13 @@
+Refactor this function to reduce its Cognitive Complexity from 35 to the 15 allowed.
+
+Cognitive Complexity of functions should not be too high python:S3776
+
+
+
+
+code
+
+
 import streamlit as st
 from signup import save_user, check_user_exists
 import boto3
@@ -13,47 +23,50 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
-# Initialize AWS S3 client
 s3_client = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID,
                          aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
-def initialize_session_state():
-    """Initialize necessary session state variables."""
-    st.session_state.setdefault('action', None)
-    st.session_state.setdefault('user_data', {})
-    st.session_state.setdefault('booking_step', 0)
+# Initialize session state variables
+if 'action' not in st.session_state:
+    st.session_state['action'] = None
+if 'user_data' not in st.session_state:
+    st.session_state['user_data'] = {}
+if 'booking_step' not in st.session_state:
+    st.session_state['booking_step'] = 0
 
 def display_homepage_header():
-    """Displays the app's logo and description."""
-    st.image("logo.jpeg", width=100)
+    """Displays the app's logo and description in the center."""
+    st.image("logo.jpeg", width=100)  # Adjust width as needed
     st.title("Welcome to the DoctorAI App")
-    st.write("This application facilitates seamless interactions between patients and healthcare providers.")
+    st.write("""
+    This application facilitates seamless interactions between patients and healthcare providers,
+    allowing for easy appointment bookings and management.
+    """)
 
-def user_options():
-    """Handle user actions for login and signup."""
+def display_user_options():
+    display_homepage_header() 
     user_type = st.radio("Select User Type:", ["Patient", "Doctor"], key="user_type")
     action = st.radio("Choose an action:", ["Login", "Signup"], key="action_choice")
-
+    
     if action == "Signup":
-        user_signup(user_type)
+        signup_page(user_type)
     elif action == "Login":
-        user_login(user_type)
+        login_page(user_type)
 
-def user_signup(user_type):
-    """Allows new users to sign up."""
+def signup_page(user_type):
     username = st.text_input("Username", key="signup_username")
     password = st.text_input("Password", type="password", key="signup_password")
-    if st.button("Sign Up"):
+    if st.button("Sign Up", key="signup"):
         if save_user(s3_client, username, password, user_type, S3_BUCKET_NAME):
-            st.success(f"Successfully signed up as a {user_type}. Please log in.")
+            st.success(f"You're signed up successfully as a {user_type}. Please log in.")
+            st.session_state['action'] = None
         else:
             st.error("Signup failed. Please try again.")
 
-def user_login(user_type):
-    """Handles user login."""
+def login_page(user_type):
     username = st.text_input("Username", key="login_username")
     password = st.text_input("Password", type="password", key="login_password")
-    if st.button("Login"):
+    if st.button("Login", key="login"):
         user_exists, user_data = check_user_exists(s3_client, username, user_type, S3_BUCKET_NAME)
         if user_exists and user_data['password'] == password:
             st.session_state['user_data'] = user_data
@@ -62,39 +75,72 @@ def user_login(user_type):
         else:
             st.error("Invalid credentials or user does not exist.")
 
+def home_page():
+    display_homepage_header()  # Display logo and app description centrally on the homepage
+    
+    if st.session_state['user_data'].get('type') == 'Patient':
+        patient_interaction()
+    elif st.session_state['user_data'].get('type') == 'Doctor':
+        doctor_interaction()
+    
+    if st.button("Logout"):
+        logout()
+
+# Implement the patient_interaction function here as described in the previous guidance
 def patient_interaction():
-    """Manage interactions with patients."""
     st.header("Book an Appointment")
-    if st.button("Start Booking Process"):
-        st.session_state['booking_step'] = 1
 
-    if st.session_state['booking_step'] == 1:
-        date = st.date_input("Choose the date for your appointment:", min_value=datetime.date.today())
-        if st.button("Set Date"):
-            st.session_state['appointment_date'] = date
-            st.session_state['booking_step'] = 2
+    # Initialize booking steps and other variables if not present
+    if 'booking_step' not in st.session_state:
+        st.session_state['booking_step'] = 0
+    if 'appointment_date' not in st.session_state:
+        st.session_state['appointment_date'] = datetime.date.today()
+    if 'appointment_time' not in st.session_state:
+        st.session_state['appointment_time'] = datetime.datetime.now().time()
+    if 'appointment_reason' not in st.session_state:
+        st.session_state['appointment_reason'] = ''
 
-    if st.session_state['booking_step'] == 2:
-        time = st.time_input("Choose your preferred time:")
-        if st.button("Set Time"):
-            st.session_state['appointment_time'] = time
-            st.session_state['booking_step'] = 3
+    # Display the current step for debugging
+    # st.write(f"Current booking step: {st.session_state.booking_step}")
 
-    if st.session_state['booking_step'] == 3:
-        reason = st.text_area("Reason for the appointment:")
-        if st.button("Submit Appointment"):
+    if st.session_state.booking_step == 0:
+        if st.button("Start Booking Process"):
+            st.session_state.booking_step = 1
+
+    if st.session_state.booking_step == 1:
+        st.session_state['appointment_date'] = st.date_input("Choose the date for your appointment:", key="date", min_value=datetime.date.today())
+        if st.button("Set Date", key="set_date"):
+            st.session_state.booking_step = 2
+
+    if st.session_state.booking_step == 2:
+        st.session_state['appointment_time'] = st.time_input("Choose your preferred time:", key="time")
+        if st.button("Set Time", key="set_time"):
+            st.session_state.booking_step = 3
+
+    if st.session_state.booking_step == 3:
+        st.session_state['appointment_reason'] = st.text_area("Reason for the appointment:", key="reason")
+        if st.button("Submit Appointment", key="submit_appointment"):
+            # Gather the appointment details
             appointment_details = {
                 "username": st.session_state['user_data']['username'],
                 "date": st.session_state['appointment_date'].strftime("%Y-%m-%d"),
                 "time": st.session_state['appointment_time'].strftime("%H:%M"),
-                "reason": reason
+                "reason": st.session_state['appointment_reason']
             }
+            # Call the function to save the appointment details to S3
             save_appointment_to_s3(appointment_details)
             st.success("Your appointment has been booked successfully.")
+            
+            # Reset the booking process
             st.session_state['booking_step'] = 0
+            del st.session_state['appointment_date'], st.session_state['appointment_time'], st.session_state['appointment_reason']
+            # Optionally, rerun the app to refresh the state
+            st.experimental_rerun()
 
+
+
+# Implement the doctor_interaction function here as described in the previous guidance
 def doctor_interaction():
-    """Display doctor-specific interactions."""
     st.header("Doctor Portal")
     if st.button("Fetch Appointments"):
         appointments_df = fetch_appointments_from_s3()
@@ -103,19 +149,21 @@ def doctor_interaction():
         else:
             st.write("No appointments found.")
 
+# Implement the save_appointment_to_s3 function here as described in the previous guidance
 def save_appointment_to_s3(details):
-    """Save the appointment details to S3."""
-    key = f"appointments/{details['username']}/{details['date']}_{details['time'].replace(':', '-')}.json"
+    appointment_key = f"appointments/{details['username']}/{details['date']}_{details['time'].replace(':', '-')}.json"
     try:
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=key, Body=json.dumps(details))
-        st.success("Appointment saved successfully.")
+        appointment_json = json.dumps(details)
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=appointment_key, Body=appointment_json)
+        st.success("Appointment booked successfully.")
     except Exception as e:
         st.error(f"Failed to save the appointment: {str(e)}")
 
+# Implement the fetch_appointments_from_s3 function here as described in the previous guidance
 def fetch_appointments_from_s3():
-    """Retrieve appointments from S3."""
+    doctor_username = st.session_state['user_data'].get('username')
+    prefix = f"appointments/"
     try:
-        prefix = "appointments/"
         response = s3_client.list_objects_v2(Bucket=S3_BUCKET_NAME, Prefix=prefix)
         appointments = [json.loads(s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=item['Key'])['Body'].read().decode("utf-8")) for item in response.get('Contents', [])]
         return pd.DataFrame(appointments)
@@ -123,17 +171,17 @@ def fetch_appointments_from_s3():
         st.error(f"Failed to fetch appointments: {str(e)}")
         return pd.DataFrame()
 
+def logout():
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.session_state['action'] = None
+    st.experimental_rerun()
+
 def main():
-    """Main function to control the application flow."""
-    initialize_session_state()
-    display_homepage_header()
     if st.session_state.get('action') == 'loggedin':
-        if st.session_state['user_data'].get('type') == 'Patient':
-            patient_interaction()
-        elif st.session_state['user_data'].get('type') == 'Doctor':
-            doctor_interaction()
+        home_page()
     else:
-        user_options()
+        display_user_options()
 
 if __name__ == "__main__":
     main()

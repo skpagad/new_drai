@@ -1,13 +1,3 @@
-Refactor this function to reduce its Cognitive Complexity from 35 to the 15 allowed.
-
-Cognitive Complexity of functions should not be too high python:S3776
-
-
-
-
-code
-
-
 import streamlit as st
 from signup import save_user, check_user_exists
 import boto3

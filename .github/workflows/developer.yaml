@@ -25,7 +25,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       with:
-        projectBaseDir: .  # if project is not in the root directory
         args: >
           -Dsonar.organization=skpagad
           -Dsonar.projectKey=skpagad
